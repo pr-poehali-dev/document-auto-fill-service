@@ -13,6 +13,7 @@ interface DocumentTemplate {
   name: string;
   content: string;
   placeholders: string[];
+  placeholderLabels: Record<string, string>;
   createdAt: Date;
 }
 
@@ -22,8 +23,11 @@ const Documents = () => {
   const [templateContent, setTemplateContent] = useState('');
   const [templateName, setTemplateName] = useState('');
   const [fillValues, setFillValues] = useState<Record<string, string>>({});
+  const [placeholderLabels, setPlaceholderLabels] = useState<Record<string, string>>({});
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isFillDialogOpen, setIsFillDialogOpen] = useState(false);
+  const [isLabelDialogOpen, setIsLabelDialogOpen] = useState(false);
+  const [tempPlaceholders, setTempPlaceholders] = useState<string[]>([]);
   const { toast } = useToast();
 
   const extractPlaceholders = (content: string): string[] => {
@@ -33,7 +37,30 @@ const Documents = () => {
     return [...new Set(matches.map(m => m.replace(/[{}]/g, '')))];
   };
 
-  const handleUploadTemplate = () => {
+  const getDefaultLabel = (placeholder: string): string => {
+    const labels: Record<string, string> = {
+      'name': 'Имя',
+      'surname': 'Фамилия',
+      'lastname': 'Отчество',
+      'company': 'Компания',
+      'company_name': 'Название компании',
+      'client': 'Клиент',
+      'client_name': 'Имя клиента',
+      'date': 'Дата',
+      'address': 'Адрес',
+      'phone': 'Телефон',
+      'email': 'Email',
+      'sum': 'Сумма',
+      'amount': 'Количество',
+      'price': 'Цена',
+      'position': 'Должность',
+      'passport': 'Паспорт',
+      'inn': 'ИНН',
+    };
+    return labels[placeholder.toLowerCase()] || placeholder.replace(/_/g, ' ');
+  };
+
+  const handlePrepareTemplate = () => {
     if (!templateName.trim() || !templateContent.trim()) {
       toast({
         title: 'Ошибка',
@@ -54,22 +81,36 @@ const Documents = () => {
       return;
     }
 
+    setTempPlaceholders(placeholders);
+    const defaultLabels: Record<string, string> = {};
+    placeholders.forEach(p => {
+      defaultLabels[p] = getDefaultLabel(p);
+    });
+    setPlaceholderLabels(defaultLabels);
+    setIsDialogOpen(false);
+    setIsLabelDialogOpen(true);
+  };
+
+  const handleUploadTemplate = () => {
     const newDoc: DocumentTemplate = {
       id: Date.now().toString(),
       name: templateName,
       content: templateContent,
-      placeholders,
+      placeholders: tempPlaceholders,
+      placeholderLabels: placeholderLabels,
       createdAt: new Date(),
     };
 
     setDocuments([...documents, newDoc]);
     setTemplateContent('');
     setTemplateName('');
-    setIsDialogOpen(false);
+    setPlaceholderLabels({});
+    setTempPlaceholders([]);
+    setIsLabelDialogOpen(false);
     
     toast({
       title: 'Успешно',
-      description: `Шаблон создан. Найдено полей: ${placeholders.length}`,
+      description: `Шаблон создан. Найдено полей: ${tempPlaceholders.length}`,
     });
   };
 
@@ -176,8 +217,8 @@ const Documents = () => {
                     className="mt-1.5 font-mono text-sm"
                   />
                 </div>
-                <Button onClick={handleUploadTemplate} className="w-full">
-                  Создать шаблон
+                <Button onClick={handlePrepareTemplate} className="w-full">
+                  Далее
                 </Button>
               </div>
             </DialogContent>
@@ -224,9 +265,9 @@ const Documents = () => {
                       {doc.placeholders.slice(0, 3).map((placeholder) => (
                         <span
                           key={placeholder}
-                          className="text-xs bg-muted px-2 py-1 rounded-md font-mono"
+                          className="text-xs bg-muted px-2 py-1 rounded-md"
                         >
-                          {placeholder}
+                          {doc.placeholderLabels[placeholder] || placeholder}
                         </span>
                       ))}
                       {doc.placeholders.length > 3 && (
@@ -260,8 +301,8 @@ const Documents = () => {
             <div className="space-y-4 mt-4">
               {selectedDoc?.placeholders.map((placeholder) => (
                 <div key={placeholder}>
-                  <Label htmlFor={placeholder} className="capitalize">
-                    {placeholder.replace(/_/g, ' ')}
+                  <Label htmlFor={placeholder}>
+                    {selectedDoc.placeholderLabels[placeholder] || placeholder}
                   </Label>
                   <Input
                     id={placeholder}
@@ -280,6 +321,54 @@ const Documents = () => {
                 </Button>
                 <Button variant="outline" onClick={() => setIsFillDialogOpen(false)}>
                   Отмена
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isLabelDialogOpen} onOpenChange={setIsLabelDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Настройка наименований полей</DialogTitle>
+              <DialogDescription>
+                Укажите понятные названия для каждого плейсхолдера
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              {tempPlaceholders.map((placeholder) => (
+                <div key={placeholder} className="grid grid-cols-2 gap-4 items-center">
+                  <div>
+                    <Label className="text-muted-foreground text-sm font-mono">
+                      {`{{${placeholder}}}`}
+                    </Label>
+                  </div>
+                  <div>
+                    <Input
+                      value={placeholderLabels[placeholder] || ''}
+                      onChange={(e) =>
+                        setPlaceholderLabels({
+                          ...placeholderLabels,
+                          [placeholder]: e.target.value,
+                        })
+                      }
+                      placeholder="Наименование"
+                    />
+                  </div>
+                </div>
+              ))}
+              <div className="flex gap-3 pt-4">
+                <Button onClick={handleUploadTemplate} className="flex-1">
+                  Создать шаблон
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsLabelDialogOpen(false);
+                    setIsDialogOpen(true);
+                  }}
+                >
+                  Назад
                 </Button>
               </div>
             </div>
