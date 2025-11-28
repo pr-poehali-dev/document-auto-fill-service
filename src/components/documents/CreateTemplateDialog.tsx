@@ -108,9 +108,16 @@ const CreateTemplateDialog = ({
                 </label>
               </div>
               {templateContent && (
-                <div className="mt-3 p-3 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-2">Предварительный просмотр:</p>
-                  <p className="text-xs font-mono line-clamp-3">{templateContent}</p>
+                <div className="mt-3 p-4 bg-muted rounded-lg max-h-64 overflow-y-auto">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium text-foreground">Предварительный просмотр:</p>
+                    <span className="text-xs text-muted-foreground">
+                      {templateContent.length} символов
+                    </span>
+                  </div>
+                  <div className="text-xs font-mono whitespace-pre-wrap break-words bg-background p-3 rounded border">
+                    {templateContent}
+                  </div>
                 </div>
               )}
             </div>

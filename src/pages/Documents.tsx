@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import CreateTemplateDialog from '@/components/documents/CreateTemplateDialog';
 import PlaceholderLabelsDialog from '@/components/documents/PlaceholderLabelsDialog';
 import FillDocumentDialog from '@/components/documents/FillDocumentDialog';
@@ -142,7 +143,7 @@ const Documents = () => {
     setIsFillDialogOpen(true);
   };
 
-  const generateFilledDocument = () => {
+  const generateFilledDocument = async () => {
     if (!selectedDoc) return;
 
     let filledContent = selectedDoc.content;
@@ -152,30 +153,49 @@ const Documents = () => {
     });
 
     if (exportFormat === 'pdf') {
-      const doc = new jsPDF();
-      
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const margin = 15;
-      const maxWidth = pageWidth - 2 * margin;
-      
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(12);
-      
-      const lines = doc.splitTextToSize(filledContent, maxWidth);
-      let y = 20;
-      const lineHeight = 7;
-      const pageHeight = doc.internal.pageSize.getHeight();
-      
-      lines.forEach((line: string) => {
-        if (y + lineHeight > pageHeight - margin) {
-          doc.addPage();
-          y = 20;
-        }
-        doc.text(line, margin, y);
-        y += lineHeight;
+      const tempDiv = document.createElement('div');
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.left = '-9999px';
+      tempDiv.style.width = '210mm';
+      tempDiv.style.padding = '20mm';
+      tempDiv.style.backgroundColor = 'white';
+      tempDiv.style.fontFamily = 'Arial, sans-serif';
+      tempDiv.style.fontSize = '12pt';
+      tempDiv.style.lineHeight = '1.6';
+      tempDiv.style.color = 'black';
+      tempDiv.style.whiteSpace = 'pre-wrap';
+      tempDiv.textContent = filledContent;
+      document.body.appendChild(tempDiv);
+
+      const canvas = await html2canvas(tempDiv, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
       });
-      
-      doc.save(`${selectedDoc.name}_заполненный.pdf`);
+
+      document.body.removeChild(tempDiv);
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      pdf.save(`${selectedDoc.name}_заполненный.pdf`);
     } else {
       const blob = new Blob([filledContent], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
