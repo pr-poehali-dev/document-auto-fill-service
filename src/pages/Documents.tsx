@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { jsPDF } from 'jspdf';
+import CreateTemplateDialog from '@/components/documents/CreateTemplateDialog';
+import PlaceholderLabelsDialog from '@/components/documents/PlaceholderLabelsDialog';
+import FillDocumentDialog from '@/components/documents/FillDocumentDialog';
+import DocumentCard from '@/components/documents/DocumentCard';
 
 interface DocumentTemplate {
   id: string;
@@ -227,109 +226,18 @@ const Documents = () => {
               Управляйте шаблонами и заполняйте документы
             </p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="lg" className="gap-2">
-                <Icon name="Plus" size={20} />
-                Создать шаблон
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Создание нового шаблона</DialogTitle>
-                <DialogDescription>
-                  Используйте формат {`{{placeholder}}`} для полей, которые нужно заполнить
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 mt-4">
-                <div>
-                  <Label htmlFor="template-name">Название шаблона</Label>
-                  <Input
-                    id="template-name"
-                    placeholder="Например: Договор аренды"
-                    value={templateName}
-                    onChange={(e) => setTemplateName(e.target.value)}
-                    className="mt-1.5"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <Label>Способ добавления</Label>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant={uploadMethod === 'file' ? 'default' : 'outline'}
-                      onClick={() => setUploadMethod('file')}
-                      className="flex-1"
-                    >
-                      <Icon name="Upload" size={18} className="mr-2" />
-                      Загрузить файл
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={uploadMethod === 'text' ? 'default' : 'outline'}
-                      onClick={() => setUploadMethod('text')}
-                      className="flex-1"
-                    >
-                      <Icon name="Type" size={18} className="mr-2" />
-                      Ввести текст
-                    </Button>
-                  </div>
-                </div>
-
-                {uploadMethod === 'file' ? (
-                  <div>
-                    <Label htmlFor="file-upload">Файл шаблона</Label>
-                    <div className="mt-1.5">
-                      <label
-                        htmlFor="file-upload"
-                        className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                          <Icon name="FileUp" size={32} className="text-muted-foreground mb-2" />
-                          <p className="text-sm text-muted-foreground">
-                            {templateContent ? 'Файл загружен' : 'Нажмите для загрузки файла'}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            TXT, DOC, DOCX
-                          </p>
-                        </div>
-                        <input
-                          id="file-upload"
-                          type="file"
-                          className="hidden"
-                          accept=".txt,.doc,.docx"
-                          onChange={handleFileUpload}
-                        />
-                      </label>
-                    </div>
-                    {templateContent && (
-                      <div className="mt-3 p-3 bg-muted rounded-lg">
-                        <p className="text-sm text-muted-foreground mb-2">Предварительный просмотр:</p>
-                        <p className="text-xs font-mono line-clamp-3">{templateContent}</p>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <Label htmlFor="template-content">Содержимое шаблона</Label>
-                    <Textarea
-                      id="template-content"
-                      placeholder={`Пример:\nДоговор заключен между {{company_name}} и {{client_name}} от {{date}}.`}
-                      value={templateContent}
-                      onChange={(e) => setTemplateContent(e.target.value)}
-                      rows={10}
-                      className="mt-1.5 font-mono text-sm"
-                    />
-                  </div>
-                )}
-
-                <Button onClick={handlePrepareTemplate} className="w-full">
-                  Далее
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <CreateTemplateDialog
+            isOpen={isDialogOpen}
+            onOpenChange={setIsDialogOpen}
+            templateName={templateName}
+            setTemplateName={setTemplateName}
+            templateContent={templateContent}
+            setTemplateContent={setTemplateContent}
+            uploadMethod={uploadMethod}
+            setUploadMethod={setUploadMethod}
+            handleFileUpload={handleFileUpload}
+            handlePrepareTemplate={handlePrepareTemplate}
+          />
         </div>
 
         {documents.length === 0 ? (
@@ -349,162 +257,37 @@ const Documents = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {documents.map((doc) => (
-              <Card key={doc.id} className="hover:shadow-lg transition-shadow animate-scale-in">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <Icon name="FileText" size={24} className="text-primary" />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteDocument(doc.id)}
-                    >
-                      <Icon name="Trash2" size={16} className="text-destructive" />
-                    </Button>
-                  </div>
-                  <CardTitle className="mt-3">{doc.name}</CardTitle>
-                  <CardDescription>
-                    {doc.placeholders.length} {doc.placeholders.length === 1 ? 'поле' : 'полей'} для заполнения
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap gap-1.5">
-                      {doc.placeholders.slice(0, 3).map((placeholder) => (
-                        <span
-                          key={placeholder}
-                          className="text-xs bg-muted px-2 py-1 rounded-md"
-                        >
-                          {doc.placeholderLabels[placeholder] || placeholder}
-                        </span>
-                      ))}
-                      {doc.placeholders.length > 3 && (
-                        <span className="text-xs bg-muted px-2 py-1 rounded-md">
-                          +{doc.placeholders.length - 3}
-                        </span>
-                      )}
-                    </div>
-                    <Button
-                      onClick={() => handleFillDocument(doc)}
-                      className="w-full"
-                    >
-                      <Icon name="Edit" size={16} className="mr-2" />
-                      Заполнить
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              <DocumentCard
+                key={doc.id}
+                doc={doc}
+                onFill={handleFillDocument}
+                onDelete={handleDeleteDocument}
+              />
             ))}
           </div>
         )}
 
-        <Dialog open={isFillDialogOpen} onOpenChange={setIsFillDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Заполнение: {selectedDoc?.name}</DialogTitle>
-              <DialogDescription>
-                Заполните поля для генерации документа
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 mt-4">
-              {selectedDoc?.placeholders.map((placeholder) => (
-                <div key={placeholder}>
-                  <Label htmlFor={placeholder}>
-                    {selectedDoc.placeholderLabels[placeholder] || placeholder}
-                  </Label>
-                  <Input
-                    id={placeholder}
-                    value={fillValues[placeholder] || ''}
-                    onChange={(e) =>
-                      setFillValues({ ...fillValues, [placeholder]: e.target.value })
-                    }
-                    className="mt-1.5"
-                  />
-                </div>
-              ))}
-              
-              <div className="pt-4 border-t">
-                <Label htmlFor="export-format">Формат экспорта</Label>
-                <Select value={exportFormat} onValueChange={(value: 'txt' | 'pdf') => setExportFormat(value)}>
-                  <SelectTrigger id="export-format" className="mt-1.5">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pdf">
-                      <div className="flex items-center gap-2">
-                        <Icon name="FileText" size={16} />
-                        <span>PDF документ</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="txt">
-                      <div className="flex items-center gap-2">
-                        <Icon name="File" size={16} />
-                        <span>Текстовый файл</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        <FillDocumentDialog
+          isOpen={isFillDialogOpen}
+          onOpenChange={setIsFillDialogOpen}
+          selectedDoc={selectedDoc}
+          fillValues={fillValues}
+          setFillValues={setFillValues}
+          exportFormat={exportFormat}
+          setExportFormat={setExportFormat}
+          generateFilledDocument={generateFilledDocument}
+        />
 
-              <div className="flex gap-3 pt-4">
-                <Button onClick={generateFilledDocument} className="flex-1">
-                  <Icon name="Download" size={18} className="mr-2" />
-                  Скачать {exportFormat.toUpperCase()}
-                </Button>
-                <Button variant="outline" onClick={() => setIsFillDialogOpen(false)}>
-                  Отмена
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={isLabelDialogOpen} onOpenChange={setIsLabelDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Настройка наименований полей</DialogTitle>
-              <DialogDescription>
-                Укажите понятные названия для каждого плейсхолдера
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 mt-4">
-              {tempPlaceholders.map((placeholder) => (
-                <div key={placeholder} className="grid grid-cols-2 gap-4 items-center">
-                  <div>
-                    <Label className="text-muted-foreground text-sm font-mono">
-                      {`{{${placeholder}}}`}
-                    </Label>
-                  </div>
-                  <div>
-                    <Input
-                      value={placeholderLabels[placeholder] || ''}
-                      onChange={(e) =>
-                        setPlaceholderLabels({
-                          ...placeholderLabels,
-                          [placeholder]: e.target.value,
-                        })
-                      }
-                      placeholder="Наименование"
-                    />
-                  </div>
-                </div>
-              ))}
-              <div className="flex gap-3 pt-4">
-                <Button onClick={handleUploadTemplate} className="flex-1">
-                  Создать шаблон
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setIsLabelDialogOpen(false);
-                    setIsDialogOpen(true);
-                  }}
-                >
-                  Назад
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <PlaceholderLabelsDialog
+          isOpen={isLabelDialogOpen}
+          onOpenChange={setIsLabelDialogOpen}
+          tempPlaceholders={tempPlaceholders}
+          placeholderLabels={placeholderLabels}
+          setPlaceholderLabels={setPlaceholderLabels}
+          handleUploadTemplate={handleUploadTemplate}
+          setIsDialogOpen={setIsDialogOpen}
+          setIsLabelDialogOpen={setIsLabelDialogOpen}
+        />
       </main>
     </div>
   );
