@@ -5,8 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
+import { jsPDF } from 'jspdf';
 
 interface DocumentTemplate {
   id: string;
@@ -29,6 +31,7 @@ const Documents = () => {
   const [isLabelDialogOpen, setIsLabelDialogOpen] = useState(false);
   const [tempPlaceholders, setTempPlaceholders] = useState<string[]>([]);
   const [uploadMethod, setUploadMethod] = useState<'text' | 'file'>('text');
+  const [exportFormat, setExportFormat] = useState<'txt' | 'pdf'>('pdf');
   const { toast } = useToast();
 
   const extractPlaceholders = (content: string): string[] => {
@@ -149,20 +152,47 @@ const Documents = () => {
       filledContent = filledContent.replace(regex, value || `{{${key}}}`);
     });
 
-    const blob = new Blob([filledContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${selectedDoc.name}_заполненный.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    if (exportFormat === 'pdf') {
+      const doc = new jsPDF();
+      
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 15;
+      const maxWidth = pageWidth - 2 * margin;
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(12);
+      
+      const lines = doc.splitTextToSize(filledContent, maxWidth);
+      let y = 20;
+      const lineHeight = 7;
+      const pageHeight = doc.internal.pageSize.getHeight();
+      
+      lines.forEach((line: string) => {
+        if (y + lineHeight > pageHeight - margin) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(line, margin, y);
+        y += lineHeight;
+      });
+      
+      doc.save(`${selectedDoc.name}_заполненный.pdf`);
+    } else {
+      const blob = new Blob([filledContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${selectedDoc.name}_заполненный.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
 
     setIsFillDialogOpen(false);
     toast({
       title: 'Готово',
-      description: 'Документ успешно сформирован и загружен',
+      description: `Документ успешно сформирован в формате ${exportFormat.toUpperCase()}`,
     });
   };
 
@@ -391,10 +421,34 @@ const Documents = () => {
                   />
                 </div>
               ))}
+              
+              <div className="pt-4 border-t">
+                <Label htmlFor="export-format">Формат экспорта</Label>
+                <Select value={exportFormat} onValueChange={(value: 'txt' | 'pdf') => setExportFormat(value)}>
+                  <SelectTrigger id="export-format" className="mt-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pdf">
+                      <div className="flex items-center gap-2">
+                        <Icon name="FileText" size={16} />
+                        <span>PDF документ</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="txt">
+                      <div className="flex items-center gap-2">
+                        <Icon name="File" size={16} />
+                        <span>Текстовый файл</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="flex gap-3 pt-4">
                 <Button onClick={generateFilledDocument} className="flex-1">
                   <Icon name="Download" size={18} className="mr-2" />
-                  Скачать документ
+                  Скачать {exportFormat.toUpperCase()}
                 </Button>
                 <Button variant="outline" onClick={() => setIsFillDialogOpen(false)}>
                   Отмена
